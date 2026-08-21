@@ -36,6 +36,7 @@ ffmpeg-next = { git = "https://github.com/zmwangx/rust-ffmpeg.git", default-feat
     "format",
     "software-resampling",
     "software-scaling",
+    "rpi",
 ] }
 log = { version = "0.4", features = ["kv"] }
 pollster = { version = "1.0", optional = true }

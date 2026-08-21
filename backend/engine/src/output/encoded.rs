@@ -1037,6 +1037,7 @@ enum VideoEncoderBackend {
     Vaapi,
     VpxVp9,
     SvtAv1,
+    V4l2m2m,
 }
 
 impl VideoEncoderBackend {
@@ -1055,6 +1056,8 @@ impl VideoEncoderBackend {
             Self::VpxVp9
         } else if name == "libsvtav1" {
             Self::SvtAv1
+        } else if name.ends_with("_v4l2m2m") {
+            Self::V4l2m2m
         } else {
             Self::Software
         }
@@ -1076,13 +1079,15 @@ impl VideoEncoderBackend {
             | Self::X265
             | Self::Nvenc
             | Self::VpxVp9
-            | Self::SvtAv1 => Pixel::YUV420P,
+            | Self::SvtAv1
+            | Self::V4l2m2m => Pixel::YUV420P,
         }
     }
 
     fn uses_target_bitrate(self, cfg: &OutputConfig) -> bool {
         cfg.video_option("rate_control") == Some("cbr")
             || self == Self::VpxVp9
+            || self == Self::V4l2m2m
             || (self == Self::Vaapi && cfg.video_option("rate_control") == Some("vbr"))
     }
 
@@ -1164,6 +1169,11 @@ impl VideoEncoderBackend {
                 options.set("bufsize", &maxrate.saturating_mul(2).to_string());
             }
             Self::Software => {}
+            // The V4L2 M2M encoder wrapper exposes no rate-control AVOptions
+            // (no maxrate/bufsize/crf/qp) — the driver only takes a target
+            // bitrate via AVCodecContext::bit_rate, which uses_target_bitrate()
+            // already sets before the encoder opens.
+            Self::V4l2m2m => {}
         }
     }
 }
@@ -1325,6 +1335,25 @@ mod open_tests {
             VideoEncoderBackend::from_name("mpeg4"),
             VideoEncoderBackend::Software
         );
+        assert_eq!(
+            VideoEncoderBackend::from_name("h264_v4l2m2m"),
+            VideoEncoderBackend::V4l2m2m
+        );
+    }
+
+    #[test]
+    fn v4l2m2m_always_targets_the_configured_bitrate() {
+        // The V4L2 M2M encoder wrapper exposes no maxrate/bufsize/crf/qp
+        // AVOptions, so it must always get a bit_rate set on the codec
+        // context regardless of the configured rate_control option, or the
+        // driver falls back to its own (often very low) default bitrate.
+        let cfg = OutputConfig::new(320, 240, 25, 44_100);
+        assert!(VideoEncoderBackend::V4l2m2m.uses_target_bitrate(&cfg));
+
+        let mut options = ffmpeg::Dictionary::new();
+        VideoEncoderBackend::V4l2m2m.configure_options(&mut options, &cfg, 2_400_000);
+        assert!(options.get("maxrate").is_none());
+        assert!(options.get("bufsize").is_none());
     }
 
     #[test]
