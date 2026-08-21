@@ -186,13 +186,30 @@ async fn play_loop(
             continue;
         }
 
-        validate_supported_node(config, &node.source, &node.audio)?;
+        // An empty source is intentional when playlist and configured filler
+        // are both unavailable: ff-engine then generates black video/silence.
+        // Keep that implementation detail out of the player input, but make
+        // it explicit in the operator-facing log.
+        let display_source = if node.source.is_empty() {
+            "dummy-generation"
+        } else {
+            &node.source
+        };
 
-        info!(channel = id;
-            "Play for <span class=\"log-number\">{}</span>: <span class=\"log-addr\">{}</span>",
-            sec_to_time(node.out - node.seek),
-            node.source
-        );
+        if node.audio.is_empty() {
+            info!(channel = id;
+                "Play for <span class=\"log-number\">{}</span>: <span class=\"log-addr\">{}</span>",
+                sec_to_time(node.out - node.seek),
+                display_source
+            );
+        } else {
+            info!(channel = id;
+                "Play for <span class=\"log-number\">{}</span>: <span class=\"log-addr\">{}</span> + audio: <span class=\"log-addr\">{}</span>",
+                sec_to_time(node.out - node.seek),
+                display_source,
+                node.audio
+            );
+        }
 
         if config.task.enable {
             if config.task.path.is_file() {
@@ -213,10 +230,11 @@ async fn play_loop(
         };
         let is_ad = node.ad;
         match playout
-            .play_with_timing_logo_fade_and_rate(
+            .play_with_timing_logo_fade_rate_and_audio(
                 node.source.clone(),
                 (node.seek > 0.0).then_some(node.seek),
                 duration,
+                (!node.audio.is_empty()).then(|| node.audio.clone()),
                 subtitle_media_path(config, &node.source),
                 LogoFade {
                     fade_in: !is_ad && node.last_ad,
@@ -245,10 +263,12 @@ async fn play_loop(
                 }
             }
             ClipResult::Fallback { reason } => {
-                error!(channel = id;
-                    "failed while playing {}: {reason}; fallback generated",
-                    node.source
-                );
+                if !node.source.is_empty() {
+                    error!(channel = id;
+                        "failed while playing {}: {reason}; fallback generated",
+                        display_source
+                    );
+                }
             }
             ClipResult::Stopped => {
                 // Only the desktop output ever produces `Stopped` (the user
@@ -600,28 +620,6 @@ fn validate_supported_config(config: &PlayoutConfig) -> Result<(), ServiceError>
             "audio volume must be between 0.0 and 1.5".to_string(),
         ));
     }
-    Ok(())
-}
-
-fn validate_supported_node(
-    config: &PlayoutConfig,
-    source: &str,
-    audio: &str,
-) -> Result<(), ServiceError> {
-    if !audio.is_empty() {
-        return Err(ServiceError::Conflict(
-            "backend/engine integration does not support separate audio files yet".to_string(),
-        ));
-    }
-    if config.processing.vtt_enable
-        && !Path::new(source).with_extension("vtt").is_file()
-        && subtitle_media_path(config, source).is_none()
-    {
-        warn!(channel = config.general.channel_id;
-            "WebVTT enabled, but no sidecar or dummy subtitle file found for <span class=\"log-addr\">{source}</span>"
-        );
-    }
-
     Ok(())
 }
 

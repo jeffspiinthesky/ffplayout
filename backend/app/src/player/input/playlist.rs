@@ -13,7 +13,7 @@ use crate::{
     player::{
         controller::ChannelManager,
         utils::{
-            JsonPlaylist, Media, get_date, get_delta, is_close, is_remote,
+            JsonPlaylist, Media, get_date, get_delta, is_close, is_image_source, is_remote,
             json_serializer::{read_json, set_defaults},
             modified_time, probe_media, time_in_seconds,
         },
@@ -378,8 +378,9 @@ impl CurrentProgram {
 
             trace!("Clip from init: {}", node_clone.source);
 
-            node_clone.seek += time_sec
+            let elapsed = time_sec
                 - (node_clone.begin.unwrap() - self.manager.channel.lock().await.time_shift);
+            apply_init_seek(&mut node_clone, elapsed);
 
             self.last_next_ad(&mut node_clone).await;
 
@@ -647,6 +648,20 @@ impl CurrentProgram {
                 node.duration = filler_media.duration;
                 node.probe = filler_media.probe;
                 node.is_placeholder = true;
+            } else if self.config.storage.filler_path.is_dir() {
+                // A directory is the normal configured filler location. If it
+                // currently contains no usable media, generate the built-in
+                // black/silence fallback instead of attempting to probe the
+                // directory as if it were a media file.
+                let mut dummy_duration = 60.0;
+
+                if node.duration > 0.0 && dummy_duration > duration {
+                    dummy_duration = duration;
+                }
+
+                node.seek = 0.0;
+                node.out = dummy_duration;
+                node.duration = dummy_duration;
             } else {
                 match probe_media(&self.config.storage.filler_path).await {
                     Ok(probe) => {
@@ -695,11 +710,19 @@ impl CurrentProgram {
                 }
             }
 
-            warn!(
-                channel = self.channel_id;
-                "Generate filler with <span class=\"log-number\">{:.2}</span> seconds length!",
-                node.out
-            );
+            if node.source.is_empty() {
+                info!(
+                    channel = self.channel_id;
+                    "Generate dummy with <span class=\"log-number\">{:.2}</span> seconds length.",
+                    node.out
+                );
+            } else {
+                warn!(
+                    channel = self.channel_id;
+                    "Generate filler with <span class=\"log-number\">{:.2}</span> seconds length!",
+                    node.out
+                );
+            }
         }
 
         trace!(
@@ -810,9 +833,21 @@ impl CurrentProgram {
     }
 }
 
+/// A still image has a single non-seekable frame. When playout starts in the
+/// middle of its scheduled slot, show that frame for the remaining slot rather
+/// than passing a source seek to FFmpeg.
+fn apply_init_seek(node: &mut Media, elapsed: f64) {
+    if is_image_source(&node.source) {
+        node.out = (node.out - node.seek - elapsed).max(0.0);
+        node.seek = 0.0;
+    } else {
+        node.seek += elapsed;
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{LastClipEnd, last_clip_end, placeholder_duration};
+    use super::{LastClipEnd, apply_init_seek, last_clip_end, placeholder_duration};
     use crate::player::utils::Media;
 
     fn media(seek: f64, out: f64, duration: f64) -> Media {
@@ -837,6 +872,21 @@ mod tests {
     #[test]
     fn missing_playlist_uses_one_natural_placeholder_duration() {
         assert_eq!(placeholder_duration(86_400.0, 12.0), 12.0);
+    }
+
+    #[test]
+    fn starting_midway_through_image_keeps_it_at_first_frame() {
+        let mut node = Media {
+            source: "pray for Indonesia.png".to_string(),
+            seek: 0.0,
+            out: 10.0,
+            ..Media::default()
+        };
+
+        apply_init_seek(&mut node, 3.0);
+
+        assert_eq!(node.seek, 0.0);
+        assert_eq!(node.out, 7.0);
     }
 
     #[test]

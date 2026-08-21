@@ -40,6 +40,34 @@ pub use json_serializer::{JsonPlaylist, read_json};
 pub type MediaProbe = ff_engine::EngineMediaProbe;
 pub type SilenceDetection = ff_engine::SilenceDetection;
 
+/// Still images have no inherent media duration. Keep this aligned with the
+/// duration assigned by the playlist editor when an image is dropped into it.
+pub const DEFAULT_IMAGE_DURATION: f64 = 10.0;
+
+pub(crate) fn is_image_source(source: &str) -> bool {
+    let source = source.split('?').next().unwrap_or(source);
+    let Some(extension) = Path::new(source).extension().and_then(OsStr::to_str) else {
+        return false;
+    };
+
+    matches!(
+        extension.to_ascii_lowercase().as_str(),
+        "apng"
+            | "avif"
+            | "bmp"
+            | "exr"
+            | "gif"
+            | "jpeg"
+            | "jpg"
+            | "png"
+            | "psd"
+            | "tga"
+            | "tif"
+            | "tiff"
+            | "webp"
+    )
+}
+
 pub async fn probe_media(input: impl AsRef<std::path::Path>) -> Result<MediaProbe, ProcessError> {
     let path = input.as_ref().to_string_lossy().to_string();
     ff_engine::probe_media(&path).map_err(|error| ProcessError::Ffprobe(error.to_string()))
@@ -213,7 +241,11 @@ pub struct Media {
 
 impl Media {
     pub async fn new(index: usize, src: &str, do_probe: bool) -> Self {
-        let mut duration = 0.0;
+        let mut duration = if is_image_source(src) {
+            DEFAULT_IMAGE_DURATION
+        } else {
+            Default::default()
+        };
         let mut probe = None;
 
         if do_probe
@@ -250,6 +282,16 @@ impl Media {
     pub async fn add_probe(&mut self, check_audio: bool) -> Result<(), String> {
         let mut errors = vec![];
 
+        if self.duration <= 0.0 && is_image_source(&self.source) {
+            // A scheduled image may have an explicit `out` duration in a
+            // playlist. Images are looped by the engine, so treat that as its
+            // usable duration; otherwise use the same default as the editor.
+            self.duration = self.out.max(DEFAULT_IMAGE_DURATION);
+            if self.out <= 0.0 {
+                self.out = self.duration;
+            }
+        }
+
         if self.probe.is_none() {
             match probe_media(&self.source).await {
                 Ok(probe) => {
@@ -269,18 +311,22 @@ impl Media {
                 }
                 Err(e) => errors.push(e.to_string()),
             };
+        }
 
-            if check_audio && Path::new(&self.audio).is_file() {
-                match probe_media(&self.audio).await {
-                    Ok(probe) => {
-                        self.probe_audio = Some(probe.clone());
+        if check_audio
+            && !self.audio.is_empty()
+            && self.probe_audio.is_none()
+            && (is_remote(&self.audio) || Path::new(&self.audio).is_file())
+        {
+            match probe_media(&self.audio).await {
+                Ok(probe) => {
+                    self.probe_audio = Some(probe.clone());
 
-                        if !probe.audio.is_empty() {
-                            self.duration_audio = probe.audio[0].duration.unwrap_or_default();
-                        }
+                    if !probe.audio.is_empty() {
+                        self.duration_audio = probe.audio[0].duration.unwrap_or_default();
                     }
-                    Err(e) => errors.push(e.to_string()),
                 }
+                Err(e) => errors.push(e.to_string()),
             }
         }
 
@@ -673,9 +719,33 @@ pub fn custom_format<T: fmt::Display>(template: &str, args: &[T]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use serde_json::json;
 
-    use super::{Media, custom_format};
+    use super::{DEFAULT_IMAGE_DURATION, Media, custom_format, probe_media};
+
+    #[tokio::test]
+    async fn images_receive_a_default_playout_duration() {
+        let media = Media::new(0, "still.jpg", false).await;
+
+        assert_eq!(media.duration, DEFAULT_IMAGE_DURATION);
+        assert_eq!(media.out, DEFAULT_IMAGE_DURATION);
+    }
+
+    #[tokio::test]
+    async fn add_probe_checks_external_audio_when_main_probe_is_cached() {
+        let audio_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/assets/storage/media_mix/audio.mp3");
+        let mut media = Media::new(0, "cached-main.mp4", false).await;
+        media.probe = Some(probe_media(&audio_path).await.unwrap());
+        media.audio = audio_path.to_string_lossy().into_owned();
+
+        media.add_probe(true).await.unwrap();
+
+        assert!(media.probe_audio.is_some());
+        assert!(media.duration_audio > 0.0);
+    }
 
     #[test]
     fn legacy_advertisement_category_is_serialized_as_ad() {
