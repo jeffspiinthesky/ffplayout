@@ -671,7 +671,7 @@ fn playout_duration(node: &Media) -> Option<f64> {
 }
 
 fn engine_error(error: impl fmt::Display) -> ServiceError {
-    ServiceError::Conflict(error.to_string())
+    ServiceError::Conflict(format!("{error:#}"))
 }
 
 fn request_shutdown(shutdown: &CancellationToken) {
