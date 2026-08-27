@@ -18,7 +18,7 @@ use crate::{
     player::{
         controller::ChannelManager,
         input::source_generator,
-        utils::{Media, get_delta, sec_to_time},
+        utils::{Media, get_delta, is_remote, sec_to_time},
     },
     utils::{
         config::{OutputMode, PlayoutConfig, RecordingSource},
@@ -232,7 +232,9 @@ async fn play_loop(
         match playout
             .play_with_timing_logo_fade_rate_and_audio(
                 node.source.clone(),
-                (node.seek > 0.0).then_some(node.seek),
+                // Live/remote sources (udp://, rtmp://, ...) aren't seekable; a
+                // wall-clock catch-up seek request against one hangs the decoder.
+                (!is_remote(&node.source) && node.seek > 0.0).then_some(node.seek),
                 duration,
                 (!node.audio.is_empty()).then(|| node.audio.clone()),
                 subtitle_media_path(config, &node.source),
