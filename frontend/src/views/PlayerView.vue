@@ -17,7 +17,7 @@ import '@vuepic/vue-datepicker/dist/main.css'
 // @ts-ignore
 import { Splitpanes, Pane } from 'splitpanes'
 
-import { computed, ref, onBeforeMount } from 'vue'
+import { computed, ref, watch, onBeforeMount } from 'vue'
 import { cloneDeep } from 'es-toolkit/object'
 import { useI18n } from 'vue-i18n'
 import { useWindowSize } from '@vueuse/core'
@@ -92,6 +92,21 @@ const newSource = ref({
     audio: '',
     uid: '',
 } as PlaylistItem)
+
+// Local/probed files get `out`/`duration` filled in automatically from the
+// media's known length. Remote sources (udp://, rtmp://, ...) aren't probed,
+// so nothing pre-fills them; without this, a freshly-added remote source
+// silently keeps `out: 0` (zero length) unless the user remembers to also
+// set Out, not just Duration. Keep them in sync until the user diverges Out
+// on purpose.
+watch(
+    () => newSource.value.duration,
+    (newDuration, oldDuration) => {
+        if (newSource.value.out === oldDuration || newSource.value.out === 0) {
+            newSource.value.out = newSource.value.in + newDuration
+        }
+    },
+)
 
 switch (locale.value) {
     case 'de':
@@ -241,6 +256,11 @@ function splitSource(pos: number) {
 }
 
 function processSource(process: boolean) {
+    if (process && newSource.value.out - newSource.value.in <= 0) {
+        indexStore.msgAlert('error', t('player.invalidDuration'), 5)
+        return
+    }
+
     showSourceModal.value = false
 
     if (process) {

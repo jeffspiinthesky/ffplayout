@@ -99,6 +99,7 @@ export default {
         dateYesterday: 'A hora atual é anterior à hora de início da lista de reprodução!',
         splitVideo: 'Split Video',
         cuts: 'Cuts',
+        invalidDuration: 'Out must be greater than In — set a Duration or Out for this source.',
     },
     media: {
         notExists: 'O armazenamento não existe!',

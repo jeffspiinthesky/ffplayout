@@ -99,6 +99,7 @@ export default {
         dateYesterday: 'Current time is before the playlist start time!',
         splitVideo: 'Split Video',
         cuts: 'Cuts',
+        invalidDuration: 'Out must be greater than In — set a Duration or Out for this source.',
     },
     media: {
         notExists: 'Storage not exist!',
