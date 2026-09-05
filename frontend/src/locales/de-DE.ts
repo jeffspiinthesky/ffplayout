@@ -99,6 +99,7 @@ export default {
         dateYesterday: 'Aktuelle Uhrzeit liegt vor der Playlist-Startzeit!',
         splitVideo: 'Video aufteilen',
         cuts: 'Schnitte',
+        invalidDuration: 'Out muss größer als In sein — Dauer oder Out für diese Quelle festlegen.',
     },
     media: {
         notExists: 'Speicher existiert nicht!',
