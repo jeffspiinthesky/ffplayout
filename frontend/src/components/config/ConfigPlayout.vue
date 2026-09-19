@@ -94,8 +94,8 @@ const outputId = computed({
         }
         configStore.playout.output.audio_codec = selected.audio_codec ?? 'aac'
         configStore.playout.output.audio_bitrate = selected.audio_bitrate ?? 128
-        configStore.playout.output.service_name = selected.service_name ?? undefined
-        configStore.playout.output.service_provider = selected.service_provider ?? undefined
+        configStore.playout.output.service_name = selected.service_name ?? null
+        configStore.playout.output.service_provider = selected.service_provider ?? null
         configStore.playout.output.hls_variants = (selected.hls_variants ?? '')
             .split(';')
             .map((v) => v.trim())

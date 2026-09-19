@@ -1,0 +1,74 @@
+.TH FFPLAYOUT 1 "2026-09-19" "ffplayout" "User Commands"
+.SH NAME
+ffplayout \- 24/7 broadcasting solution
+.SH SYNOPSIS
+.B ffplayout
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B ffplayout
+streams dynamic playlists or folder contents using ffmpeg. The target can be
+an HLS playlist, an rtmp/srt/udp server, a desktop player, or any other
+output supported by ffmpeg. It also provides a web frontend and API to
+control streaming, manage configuration, files, and text overlays.
+.SH OPTIONS
+.SS Initial Setup
+.TP
+\fB\-i\fR, \fB\-\-init\fR
+Initialize defaults: global admin, paths, settings, etc.
+.TP
+\fB\-u\fR, \fB\-\-username\fR \fIUSERNAME\fR
+Create admin user.
+.TP
+\fB\-m\fR, \fB\-\-mail\fR \fIMAIL\fR
+Admin mail address.
+.TP
+\fB\-p\fR, \fB\-\-password\fR \fIPASSWORD\fR
+Admin password.
+.SS General
+.TP
+\fB\-l\fR, \fB\-\-listen\fR \fIIP:PORT\fR
+Listen on IP:PORT; defaults to 127.0.0.1:8787 when no arguments are passed.
+.TP
+\fB\-\-storage\fR \fISTORAGE\fR
+Storage root path.
+.TP
+\fB\-\-logs\fR \fILOGS\fR
+Logging path.
+.TP
+\fB\-\-log\-level\fR \fILOG_LEVEL\fR
+Override logging level: trace, debug, info, warn, error.
+.TP
+\fB\-\-db\fR \fIDB\fR
+Path to database file.
+.TP
+\fB\-c\fR, \fB\-\-channel\fR \fICHANNEL\fR...
+Channels by ids to process (for export config, generate playlist,
+foreground running, etc.).
+.SS Playlist
+.TP
+\fB\-g\fR, \fB\-\-generate\fR \fIYYYY-MM-DD\fR...
+Generate playlist for dates, like: 2022-01-01 - 2022-01-10.
+.TP
+\fB\-\-validate\fR
+Only validate given playlist.
+.SS Playout
+.TP
+\fB\-\-foreground\fR
+Run playout without webserver and frontend.
+.TP
+\fB\-f\fR, \fB\-\-folder\fR \fIFOLDER\fR
+Play folder content.
+.TP
+\fB\-o\fR, \fB\-\-output\fR \fIOUTPUT\fR
+Set output mode: desktop, hls, stream.
+.TP
+\fB\-v\fR, \fB\-\-volume\fR \fIVOLUME\fR
+Set audio volume.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \-h).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version.
+.SH SEE ALSO
+Full documentation and source: <https://github.com/ffplayout/ffplayout>
