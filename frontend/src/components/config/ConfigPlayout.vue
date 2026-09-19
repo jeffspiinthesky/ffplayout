@@ -36,6 +36,16 @@ const extensions = computed({
 
 const output = computed(() => configStore.playout.output.mode)
 
+// Mirrors the backend's StreamType::muxer() exactly (backend/engine/src/
+// utils/config.rs): udp/srt always resolve to the mpegts muxer regardless
+// of stream_format (that field only matters for Custom), so gating on
+// stream_format === 'mpegts' alone hides this for the udp/srt cases that
+// actually matter most.
+const isMpegtsStream = computed(() => {
+    const type = configStore.playout.output.stream_type
+    return type === 'udp' || type === 'srt' || (type === 'custom' && configStore.playout.output.stream_format === 'mpegts')
+})
+
 const ingestPort = computed<number | null>({
     get() {
         try {
@@ -641,7 +651,7 @@ async function onSubmitPlayout() {
                             class="input input-sm w-full"
                         />
                     </fieldset>
-                    <fieldset v-if="configStore.playout.output.stream_format === 'mpegts'" class="fieldset">
+                    <fieldset v-if="isMpegtsStream" class="fieldset">
                         <legend class="fieldset-legend">{{ t('config.serviceName') }}</legend>
                         <input
                             v-model="configStore.playout.output.service_name"
@@ -650,7 +660,7 @@ async function onSubmitPlayout() {
                             placeholder="PITS-TV"
                         />
                     </fieldset>
-                    <fieldset v-if="configStore.playout.output.stream_format === 'mpegts'" class="fieldset">
+                    <fieldset v-if="isMpegtsStream" class="fieldset">
                         <legend class="fieldset-legend">{{ t('config.serviceProvider') }}</legend>
                         <input
                             v-model="configStore.playout.output.service_provider"
