@@ -255,6 +255,8 @@ export default {
         streamUrl: 'Stream target URL',
         streamFormat: 'FFmpeg output format',
         streamTarget: 'Output target',
+        serviceName: 'DVB service name (shown on the TV)',
+        serviceProvider: 'DVB service provider',
         hlsSettings: 'HLS settings',
         hlsPlaylistName: 'Playlist name',
         outputFormat: 'Output format',

@@ -94,6 +94,8 @@ const outputId = computed({
         }
         configStore.playout.output.audio_codec = selected.audio_codec ?? 'aac'
         configStore.playout.output.audio_bitrate = selected.audio_bitrate ?? 128
+        configStore.playout.output.service_name = selected.service_name ?? undefined
+        configStore.playout.output.service_provider = selected.service_provider ?? undefined
         configStore.playout.output.hls_variants = (selected.hls_variants ?? '')
             .split(';')
             .map((v) => v.trim())
@@ -636,6 +638,23 @@ async function onSubmitPlayout() {
                         <input
                             v-model="configStore.playout.output.stream_url"
                             :type="configStore.playout.output.stream_type === 'custom' ? 'text' : 'url'"
+                            class="input input-sm w-full"
+                        />
+                    </fieldset>
+                    <fieldset v-if="configStore.playout.output.stream_format === 'mpegts'" class="fieldset">
+                        <legend class="fieldset-legend">{{ t('config.serviceName') }}</legend>
+                        <input
+                            v-model="configStore.playout.output.service_name"
+                            type="text"
+                            class="input input-sm w-full"
+                            placeholder="PITS-TV"
+                        />
+                    </fieldset>
+                    <fieldset v-if="configStore.playout.output.stream_format === 'mpegts'" class="fieldset">
+                        <legend class="fieldset-legend">{{ t('config.serviceProvider') }}</legend>
+                        <input
+                            v-model="configStore.playout.output.service_provider"
+                            type="text"
                             class="input input-sm w-full"
                         />
                     </fieldset>

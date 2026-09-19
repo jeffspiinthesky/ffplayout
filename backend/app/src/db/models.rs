@@ -498,6 +498,8 @@ pub struct Output {
     pub video_options: String,
     pub audio_codec: Option<String>,
     pub audio_bitrate: Option<i64>,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
 }
 
 impl Output {
@@ -535,6 +537,8 @@ impl Output {
             },
             audio_codec: encoded.then(|| "aac".to_string()),
             audio_bitrate: encoded.then_some(128),
+            service_name: None,
+            service_provider: None,
         }
     }
 }

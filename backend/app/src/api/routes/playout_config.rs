@@ -347,6 +347,8 @@ pub async fn update_playout_config(
         is_encoded.then_some(data.output.audio_codec.as_str()),
         (is_encoded && ff_engine::audio_codec_uses_bitrate(&data.output.audio_codec))
             .then_some(i64::from(data.output.audio_bitrate)),
+        data.output.service_name.as_deref(),
+        data.output.service_provider.as_deref(),
     )
     .await?;
     handles::update_recording_on(&mut transaction, id, &data.recording).await?;

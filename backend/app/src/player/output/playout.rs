@@ -485,6 +485,10 @@ fn engine_output_config(
         .with_channel_id(config.general.channel_id)
         .with_stream_type(config.output.stream_type.engine_stream_type())
         .with_stream_format(config.output.stream_format.clone())
+        .with_service_metadata(
+            config.output.service_name.clone(),
+            config.output.service_provider.clone(),
+        )
         .with_encoding(
             config.output.video_codec.clone(),
             config.output.video_options.clone(),

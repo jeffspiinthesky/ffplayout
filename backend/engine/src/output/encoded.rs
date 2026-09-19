@@ -351,6 +351,25 @@ impl EncodedOutput {
                 .flags()
                 .contains(format::flag::Flags::GLOBAL_HEADER);
 
+        // service_name/service_provider are mpegts-muxer-specific SDT fields
+        // (libavformat defaults them to "Service01"/"FFmpeg" if unset, which
+        // is what a real DVB-T receiver shows without this). Setting them on
+        // any other muxer would either be ignored or show up as unrelated
+        // generic container metadata, so this is deliberately narrow.
+        if let EncodedFormat::Stream { ref muxer } = output_format
+            && muxer == "mpegts"
+            && (cfg.service_name.is_some() || cfg.service_provider.is_some())
+        {
+            let mut service_meta = ffmpeg::Dictionary::new();
+            if let Some(name) = cfg.service_name.as_deref().filter(|s| !s.is_empty()) {
+                service_meta.set("service_name", name);
+            }
+            if let Some(provider) = cfg.service_provider.as_deref().filter(|s| !s.is_empty()) {
+                service_meta.set("service_provider", provider);
+            }
+            octx.set_metadata(service_meta);
+        }
+
         let stream_count = hls_variants.len().max(1);
         let mut video_streams = Vec::with_capacity(stream_count);
         let mut audio_streams = Vec::with_capacity(stream_count);
