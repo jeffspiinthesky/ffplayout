@@ -18,7 +18,12 @@ export type Output = { id: number, mode: OutputMode, stream_url: string, stream_
  * entries are added to the base rendition configured directly on this
  * output.
  */
-hls_variants: Array<string>, };
+hls_variants: Array<string>, 
+/**
+ * DVB SDT service_name (shown as the channel name on a real TV tuner).
+ * Only meaningful when the output's stream format is mpegts.
+ */
+service_name: string | null, service_provider: string | null, };
 
 export type OutputMode = "desktop" | "hls" | "stream";
 

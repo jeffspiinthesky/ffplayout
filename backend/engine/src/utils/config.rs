@@ -188,6 +188,8 @@ pub struct OutputConfig {
     pub text_overlay_state: TextOverlayState,
     pub stream_type: StreamType,
     pub stream_format: String,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
     pub video_codec: String,
     pub video_options: VideoOptions,
     pub audio_codec: String,
@@ -1116,6 +1118,8 @@ impl OutputConfig {
             text_overlay_state: TextOverlayState::default(),
             stream_type: StreamType::Rtmp,
             stream_format: String::new(),
+            service_name: None,
+            service_provider: None,
             video_codec: "libx264".to_string(),
             video_options: video_option_defaults("libx264"),
             audio_codec: "aac".to_string(),
@@ -1191,6 +1195,16 @@ impl OutputConfig {
 
     pub fn with_stream_format(mut self, stream_format: String) -> Self {
         self.stream_format = stream_format;
+        self
+    }
+
+    pub fn with_service_metadata(
+        mut self,
+        service_name: Option<String>,
+        service_provider: Option<String>,
+    ) -> Self {
+        self.service_name = service_name;
+        self.service_provider = service_provider;
         self
     }
 

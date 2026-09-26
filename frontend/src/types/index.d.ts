@@ -38,6 +38,8 @@ declare global {
         video_options: string
         audio_codec: string | null
         audio_bitrate: number | null
+        service_name: string | null
+        service_provider: string | null
         channel_id: number
     }
 

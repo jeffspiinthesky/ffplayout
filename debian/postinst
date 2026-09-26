@@ -18,6 +18,16 @@ if [ ! $(id -u $sysUser 2>/dev/null || echo -1) -ge 0 ]; then
     adduser --system --create-home $sysUser > /dev/null || adduser --system --home "/home/$sysUser" $sysUser
 fi
 
+# Hardware video encode (h264_v4l2m2m) needs access to /dev/video*, which on
+# Debian/Raspberry Pi OS is group-owned by "video" with no "other" access.
+# Without this, ffmpeg fails with "Could not find a valid device" instead of
+# falling back to software encode -- confirmed on a fresh install where this
+# step was still missing. Idempotent and safe on upgrades too, in case an
+# existing install predates this fix.
+if [ "$sysUser" != "root" ] && getent group video > /dev/null 2>&1; then
+    usermod -aG video "$sysUser" || true
+fi
+
 if [ ! -d "/usr/share/ffplayout/db" ]; then
     mkdir "/usr/share/ffplayout/db"
     mkdir -p "/usr/share/ffplayout/public/live"

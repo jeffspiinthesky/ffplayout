@@ -21,7 +21,7 @@ pub async fn insert_output<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    const QUERY: &str = "INSERT INTO outputs (channel_id, name, hls_variants, stream_url, stream_type, stream_format, hls_playlist_name, hls_segment_duration, hls_list_size, desktop_fullscreen, width, height, fps, video_codec, video_options, audio_codec, audio_bitrate) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id";
+    const QUERY: &str = "INSERT INTO outputs (channel_id, name, hls_variants, stream_url, stream_type, stream_format, hls_playlist_name, hls_segment_duration, hls_list_size, desktop_fullscreen, width, height, fps, video_codec, video_options, audio_codec, audio_bitrate, service_name, service_provider) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING id";
 
     let output_id = sqlx::query(QUERY)
         .bind(channel_id)
@@ -41,6 +41,8 @@ where
         .bind(&output.video_options)
         .bind(&output.audio_codec)
         .bind(output.audio_bitrate)
+        .bind(&output.service_name)
+        .bind(&output.service_provider)
         .fetch_one(executor)
         .await?
         .get("id");
@@ -68,6 +70,8 @@ pub async fn update_output(
     video_options: &str,
     audio_codec: Option<&str>,
     audio_bitrate: Option<i64>,
+    service_name: Option<&str>,
+    service_provider: Option<&str>,
 ) -> Result<SqliteQueryResult, ProcessError> {
     let mut connection = pool.acquire().await?;
     update_output_on(
@@ -89,6 +93,8 @@ pub async fn update_output(
         video_options,
         audio_codec,
         audio_bitrate,
+        service_name,
+        service_provider,
     )
     .await
 }
@@ -113,8 +119,10 @@ pub async fn update_output_on(
     video_options: &str,
     audio_codec: Option<&str>,
     audio_bitrate: Option<i64>,
+    service_name: Option<&str>,
+    service_provider: Option<&str>,
 ) -> Result<SqliteQueryResult, ProcessError> {
-    const QUERY: &str = "UPDATE outputs SET hls_variants = $3, stream_url = $4, stream_type = $5, stream_format = $6, hls_playlist_name = $7, hls_segment_duration = $8, hls_list_size = $9, desktop_fullscreen = $10, width = $11, height = $12, fps = $13, video_codec = $14, video_options = $15, audio_codec = $16, audio_bitrate = $17 WHERE id = $1 AND channel_id = $2";
+    const QUERY: &str = "UPDATE outputs SET hls_variants = $3, stream_url = $4, stream_type = $5, stream_format = $6, hls_playlist_name = $7, hls_segment_duration = $8, hls_list_size = $9, desktop_fullscreen = $10, width = $11, height = $12, fps = $13, video_codec = $14, video_options = $15, audio_codec = $16, audio_bitrate = $17, service_name = $18, service_provider = $19 WHERE id = $1 AND channel_id = $2";
 
     let result = sqlx::query(QUERY)
         .bind(id)
@@ -134,6 +142,8 @@ pub async fn update_output_on(
         .bind(video_options)
         .bind(audio_codec)
         .bind(audio_bitrate)
+        .bind(service_name)
+        .bind(service_provider)
         .execute(connection)
         .await?;
 

@@ -63,6 +63,19 @@ fn main() {
 
     #[cfg(not(debug_assertions))]
     {
+        // Cargo only reruns a build script for the exact paths it's told to
+        // watch -- once ANY rerun-if-changed is printed (see
+        // embed_windows_resources() above), Cargo drops its default "rerun
+        // if anything in the package changed" heuristic entirely. Without
+        // this, editing frontend source has no effect on a release build:
+        // Cargo sees build.rs's own declared inputs are unchanged, skips
+        // rerunning it, and the stale frontend/dist/ from a previous build
+        // gets silently re-embedded.
+        println!("cargo:rerun-if-changed=../../frontend/src");
+        println!("cargo:rerun-if-changed=../../package.json");
+        println!("cargo:rerun-if-changed=../../package-lock.json");
+        println!("cargo:rerun-if-changed=../../vite.config.ts");
+
         if !Path::new(RUN_P_BIN).exists() {
             info!("run-p not found, installing frontend dependencies with npm ci");
             run_npm(&["ci"]);

@@ -743,6 +743,12 @@ pub struct Output {
     /// output.
     #[serde(default)]
     pub hls_variants: Vec<String>,
+    /// DVB SDT service_name (shown as the channel name on a real TV tuner).
+    /// Only meaningful when the output's stream format is mpegts.
+    #[serde(default)]
+    pub service_name: Option<String>,
+    #[serde(default)]
+    pub service_provider: Option<String>,
 }
 
 fn default_hls_playlist_name() -> String {
@@ -820,6 +826,8 @@ impl Output {
                 .filter(|item| !item.is_empty())
                 .map(str::to_string)
                 .collect(),
+            service_name: output.service_name,
+            service_provider: output.service_provider,
         }
     }
 
@@ -1213,6 +1221,8 @@ mod output_tests {
             audio_codec: "aac".to_string(),
             audio_bitrate: 128,
             hls_variants: Vec::new(),
+            service_name: None,
+            service_provider: None,
         }
     }
 
