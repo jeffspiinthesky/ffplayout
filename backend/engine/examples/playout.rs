@@ -235,7 +235,7 @@ fn main() -> Result<()> {
         match playout.play_with_live(path, seek_seconds, &mut live)? {
             ClipResult::Played => {}
             ClipResult::Skipped => {}
-            ClipResult::LiveEnded => {}
+            ClipResult::LiveEnded | ClipResult::LiveNotReady => {}
             ClipResult::Fallback { reason } => {
                 log::error!("failed while playing {path}: {reason}; fallback generated");
             }

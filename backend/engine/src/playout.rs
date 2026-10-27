@@ -47,6 +47,30 @@ impl fmt::Display for PlaybackRestart {
 
 impl Error for PlaybackRestart {}
 
+/// A remote source (e.g. a UDP relay that is still starting) opened, but its
+/// video stream has no frame size yet. The caller should retry the source
+/// rather than fall back for the whole slot.
+#[derive(Debug)]
+pub(crate) struct LiveNotReady;
+
+impl fmt::Display for LiveNotReady {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("live input not ready: video stream has no frame size")
+    }
+}
+
+impl Error for LiveNotReady {}
+
+fn is_remote_source(path: &str) -> bool {
+    let path = path.to_ascii_lowercase();
+    [
+        "http://", "https://", "rtmp://", "rtmps://", "rtp://", "rtsp://", "udp://", "tcp://",
+        "srt://",
+    ]
+    .iter()
+    .any(|scheme| path.starts_with(scheme))
+}
+
 fn check_playback_control(playback_control: &PlaybackControl) -> Result<()> {
     if playback_control.take_restart() {
         return Err(PlaybackRestart.into());
@@ -1355,6 +1379,14 @@ impl VideoDecoder {
             codec::threading::Type::Frame,
         ));
         let decoder = ctx.decoder().video()?;
+        // A zero frame size would divide by zero in `fit_dimensions`. For a live
+        // source this usually means the stream has not delivered SPS/PPS yet.
+        if decoder.width() == 0 || decoder.height() == 0 {
+            if is_remote_source(label) {
+                return Err(LiveNotReady.into());
+            }
+            return Err(anyhow!("{label}: video stream has no frame size"));
+        }
         let stream_time_base = stream.time_base();
         let timestamps_reliable = has_valid_time_base(stream_time_base);
         let input_time_base = if timestamps_reliable {
@@ -2211,10 +2243,10 @@ mod tests {
     use super::{
         AudioDecoder, FrameRateConverter, LogoFade, MediaFadePlan, PlaybackControl, Rational,
         Timeline, apply_audio_fade, fallback_video_time_base, fit_dimensions, has_valid_time_base,
-        padding_to_sync, parse_duration_us, play_clip, play_clip_with_external_audio,
-        resample_audio_frame, should_play_loop_iteration, single_frame_repeat_frames,
-        synchronize_after_skip, synchronize_declared_stream_ends, video_frame_needs_write,
-        write_padding_video_frames,
+        is_remote_source, padding_to_sync, parse_duration_us, play_clip,
+        play_clip_with_external_audio, resample_audio_frame, should_play_loop_iteration,
+        single_frame_repeat_frames, synchronize_after_skip, synchronize_declared_stream_ends,
+        video_frame_needs_write, write_padding_video_frames,
     };
     use crate::{
         output::FrameOutput,
@@ -2922,6 +2954,13 @@ mod tests {
     #[test]
     fn fits_vertical_video_into_sixteen_by_nine() {
         assert_eq!(fit_dimensions(1024, 576, 1080, 1920), (324, 576));
+    }
+
+    #[test]
+    fn detects_remote_sources() {
+        assert!(is_remote_source("udp://239.1.1.2:5003"));
+        assert!(is_remote_source("SRT://example.com:9000"));
+        assert!(!is_remote_source("/mnt/share/YouTube/clip.mp4"));
     }
 
     #[test]
