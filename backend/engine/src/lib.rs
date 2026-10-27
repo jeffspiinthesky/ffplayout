@@ -38,7 +38,7 @@ pub use input::live::{LiveReceiver, spawn_rtmp_listener};
 pub use output::desktop::thread::run_on_main_thread as run_desktop_on_main_thread;
 pub use output::resolved_variant_playlist_path;
 use output::{FrameOutput, Output, PlaybackStopped};
-use playout::{PlaybackRestart, PlaybackSkipped, Timeline, write_fallback};
+use playout::{LiveNotReady, PlaybackRestart, PlaybackSkipped, Timeline, write_fallback};
 pub use utils::{
     clock,
     config::{
@@ -76,6 +76,7 @@ pub enum ClipResult {
     Played,
     Skipped,
     LiveEnded,
+    LiveNotReady,
     Fallback { reason: String },
     Stopped,
 }
@@ -788,6 +789,9 @@ fn play_to_output<O: FrameOutput>(
         Err(error) if error.downcast_ref::<PlaybackRestart>().is_some() => Err(error),
         Err(error) if error.downcast_ref::<PlaybackSkipped>().is_some() => Ok(ClipResult::Skipped),
         Err(error) if error.downcast_ref::<LiveEnded>().is_some() => Ok(ClipResult::LiveEnded),
+        Err(error) if error.downcast_ref::<LiveNotReady>().is_some() => {
+            Ok(ClipResult::LiveNotReady)
+        }
         Err(error) if error.downcast_ref::<PlaybackStopped>().is_some() => Ok(ClipResult::Stopped),
         Err(error) => {
             let reason = format!("{error:#}");

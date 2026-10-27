@@ -255,6 +255,18 @@ async fn play_loop(
                 node_sources = source_generator(manager.clone()).await;
                 continue;
             }
+            ClipResult::LiveNotReady => {
+                // e.g. a UDP relay that is still starting after boot. Retry the
+                // same slot instead of playing fallback for its whole duration.
+                warn!(channel = id;
+                    "Live input <span class=\"log-addr\">{}</span> not ready yet; retrying",
+                    display_source
+                );
+                sleep(Duration::from_secs(2)).await;
+                manager.list_init.store(true, Ordering::SeqCst);
+                node_sources = source_generator(manager.clone()).await;
+                continue;
+            }
             ClipResult::Played => {}
             ClipResult::Skipped => {
                 // Global shutdown also uses `skip_current` to interrupt the
