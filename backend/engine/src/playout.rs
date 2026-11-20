@@ -17,6 +17,7 @@ use crate::{
         config::{OutputConfig, TextOverlayState},
         ffmpeg::{make_video_frame_writable, reference_video_frame},
         helper::{even, open_media_input},
+        logging::log_channel_id,
     },
 };
 
@@ -69,6 +70,28 @@ fn is_remote_source(path: &str) -> bool {
     ]
     .iter()
     .any(|scheme| path.starts_with(scheme))
+}
+
+/// Sends a packet to a decoder, skipping it if the decoder rejects it as
+/// corrupt. Old files (e.g. DivX/MP3 AVIs) often contain the odd damaged frame;
+/// the ffmpeg CLI drops such packets and carries on, whereas failing here would
+/// abandon the clip and play fallback for its whole remaining duration.
+fn send_packet_or_skip(
+    decoder: &mut codec::decoder::Opened,
+    packet: &ffmpeg_next::Packet,
+    label: &str,
+) -> Result<()> {
+    match decoder.send_packet(packet) {
+        Err(ffmpeg_next::Error::InvalidData) => {
+            warn!(channel = log_channel_id();
+                "{label}: skipping corrupt packet (stream {}, pts {:?})",
+                packet.stream(),
+                packet.pts()
+            );
+            Ok(())
+        }
+        result => Ok(result?),
+    }
 }
 
 fn check_playback_control(playback_control: &PlaybackControl) -> Result<()> {
@@ -630,7 +653,9 @@ pub(crate) fn play_opened_input<O: FrameOutput>(
             check_playback_control(options.playback_control)?;
             if Some(stream.index()) == video_index {
                 if !video_finished && let Some(video) = video.as_mut() {
-                    benchmark::measure(Stage::VideoDecode, || video.decoder.send_packet(&packet))?;
+                    benchmark::measure(Stage::VideoDecode, || {
+                        send_packet_or_skip(&mut video.decoder, &packet, label)
+                    })?;
                     receive_video_frames(
                         video,
                         timeline,
@@ -662,7 +687,9 @@ pub(crate) fn play_opened_input<O: FrameOutput>(
             } else if Some(stream.index()) == audio_index
                 && let Some(audio) = audio.as_mut()
             {
-                benchmark::measure(Stage::AudioDecode, || audio.decoder.send_packet(&packet))?;
+                benchmark::measure(Stage::AudioDecode, || {
+                    send_packet_or_skip(&mut audio.decoder, &packet, label)
+                })?;
                 receive_audio_frames(
                     audio,
                     timeline,
@@ -1607,6 +1634,7 @@ struct AudioDecoder {
 /// A second input used as a clip's external audio track. It owns its demuxer
 /// so packets can be read incrementally in lockstep with the video timeline.
 pub(crate) struct ExternalAudioInput {
+    label: String,
     input: format::context::Input,
     stream_index: usize,
     fade_plan: MediaFadePlan,
@@ -1647,6 +1675,7 @@ impl ExternalAudioInput {
         );
 
         Ok(Self {
+            label: path.to_string(),
             input,
             stream_index,
             fade_plan,
@@ -1703,7 +1732,7 @@ impl ExternalAudioInput {
             };
 
             benchmark::measure(Stage::AudioDecode, || {
-                self.decoder.decoder.send_packet(&packet)
+                send_packet_or_skip(&mut self.decoder.decoder, &packet, &self.label)
             })?;
             receive_audio_frames(
                 &mut self.decoder,
@@ -2500,6 +2529,39 @@ mod tests {
             resampler.delay().is_none_or(|delay| delay.output < 64),
             "resampler retained too many output samples: {:?}",
             resampler.delay()
+        );
+    }
+
+    #[test]
+    fn skips_corrupt_audio_packet_instead_of_failing_clip() {
+        // 2s MPEG-4 Part 2 + MP3 AVI with one MP3 frame header zeroed out; the
+        // MP3 decoder rejects that packet with "Header missing" (InvalidData).
+        let cfg = OutputConfig::new(320, 240, 25, 48_000);
+        let mut timeline = Timeline::new();
+        let mut output = RecordingOutput::default();
+
+        play_clip(
+            &media_mix_asset("corrupt_mp3.avi"),
+            &cfg,
+            &mut timeline,
+            &mut output,
+            None,
+            None,
+            None,
+            LogoFade::default(),
+            &PlaybackControl::default(),
+        )
+        .unwrap();
+
+        assert!(
+            output.video_frames.len() >= 49,
+            "expected the whole clip, got {} video frames",
+            output.video_frames.len()
+        );
+        assert!(
+            output.audio_samples >= 90_000,
+            "expected about two seconds of audio, got {} samples",
+            output.audio_samples
         );
     }
 

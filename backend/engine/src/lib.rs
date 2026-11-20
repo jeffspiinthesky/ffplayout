@@ -799,6 +799,11 @@ fn play_to_output<O: FrameOutput>(
                 .duration_seconds
                 .filter(|duration| duration.is_finite() && *duration > 0.0)
                 .unwrap_or(fallback_duration);
+            // The caller only learns about the failure once the fallback has
+            // finished, which can be the whole remaining slot. Say why now.
+            log::error!(channel = utils::logging::log_channel_id();
+                "failed while playing {path}: {reason}; playing fallback for {duration:.1}s"
+            );
             write_fallback(path, config, timeline, output, duration, playback_control)
                 .with_context(|| format!("failed to generate fallback for {path}"))?;
             timeline.finish_logo_fade(options.logo_fade);
