@@ -129,7 +129,7 @@ fn configured_level() -> c_int {
     })
 }
 
-fn log_channel_id() -> i32 {
+pub(crate) fn log_channel_id() -> i32 {
     INGEST_LOG_CONTEXT.with(|context| {
         context
             .borrow()
